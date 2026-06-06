@@ -37,7 +37,7 @@ func LoadConfig(path string) (config Config, err error) {
 	viper.SetDefault("JWT_EXPIRATION_HOURS", 72)
 	viper.SetDefault("COOKIE_DOMAINS", []string{"localhost"})
 	viper.SetDefault("SECURE_COOKIE", false)
-	viper.SetDefault("ALLOWED_ORIGINS", []string{"http://localhost:5173"})
+	viper.SetDefault("ALLOWED_ORIGINS", []string{"http://localhost:5173", "https://d24nilwrs6bt1u.cloudfront.net"})
 
 	err = viper.ReadInConfig()
 	if err != nil {
@@ -51,8 +51,10 @@ func LoadConfig(path string) (config Config, err error) {
 		return
 	}
 
-	// Manually handle comma-separated strings for slices if viper didn't split them
-	if allowedOrigins := viper.GetString("ALLOWED_ORIGINS"); allowedOrigins != "" {
+	// Manually handle comma-separated strings for slices from environment variables.
+	// When ALLOWED_ORIGINS is set as an env var (e.g. "http://a.com,http://b.com"),
+	// viper may not split it into a slice automatically, so we handle it here.
+	if allowedOrigins := viper.GetString("ALLOWED_ORIGINS"); allowedOrigins != "" && !strings.HasPrefix(allowedOrigins, "[") {
 		parts := strings.Split(allowedOrigins, ",")
 		var cleaned []string
 		for _, p := range parts {
@@ -66,7 +68,7 @@ func LoadConfig(path string) (config Config, err error) {
 		config.AllowedOrigins = cleaned
 	}
 
-	if cookieDomains := viper.GetString("COOKIE_DOMAINS"); cookieDomains != "" {
+	if cookieDomains := viper.GetString("COOKIE_DOMAINS"); cookieDomains != "" && !strings.HasPrefix(cookieDomains, "[") {
 		parts := strings.Split(cookieDomains, ",")
 		var cleaned []string
 		for _, p := range parts {

@@ -86,8 +86,37 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       - name: Trigger Auto Scaling Group Rolling Update
-        # This tells AWS to gracefully cycle out the old EC2 instances and spin up new ones running the latest Docker image
+        # This tells AWS to gracefully cycle out the old EC2 instances and spin up new ones running the latest Docker image.
+        # We first cancel any in-progress refresh to avoid InstanceRefreshInProgress errors.
         run: |
+          # Check if there's an active instance refresh and cancel it
+          ACTIVE_REFRESH=$(aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name ${{ secrets.ASG_NAME }} \
+            --query "InstanceRefreshes[?Status=='InProgress' || Status=='Pending' || Status=='Cancelling'].InstanceRefreshId" \
+            --output text)
+
+          if [ -n "$ACTIVE_REFRESH" ] && [ "$ACTIVE_REFRESH" != "None" ]; then
+            echo "Found active instance refresh: $ACTIVE_REFRESH. Cancelling..."
+            aws autoscaling cancel-instance-refresh \
+              --auto-scaling-group-name ${{ secrets.ASG_NAME }} || true
+
+            # Wait for the cancellation to complete (max 2 minutes)
+            for i in $(seq 1 12); do
+              STATUS=$(aws autoscaling describe-instance-refreshes \
+                --auto-scaling-group-name ${{ secrets.ASG_NAME }} \
+                --query "InstanceRefreshes[0].Status" \
+                --output text)
+              echo "Refresh status: $STATUS"
+              if [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Successful" ]; then
+                echo "Previous refresh cleared."
+                break
+              fi
+              echo "Waiting for cancellation... ($i/12)"
+              sleep 10
+            done
+          fi
+
+          echo "Starting new instance refresh..."
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name ${{ secrets.ASG_NAME }} \
             --strategy Rolling \

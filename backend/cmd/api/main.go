@@ -167,7 +167,6 @@ func setupRouter(db *mongo.Client, cfg config.Config, tokenSvc *auth.TokenServic
 
 	// Middleware
 	corsMiddleware := middleware.CORSMiddleware(cfg.AllowedOrigins)
-	// corsMiddleware := middleware.CORSMiddleware2()
 	authMiddleware := middleware.AuthMiddleware(tokenSvc, cfg)
 
 	// Apply CORS middleware to the router
