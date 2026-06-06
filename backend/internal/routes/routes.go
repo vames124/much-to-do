@@ -14,8 +14,9 @@ import (
 )
 
 // RegisterRoutes sets up all application routes.
+// The router parameter can be an Engine or a RouterGroup (e.g. /api).
 func RegisterRoutes(
-	router *gin.Engine,
+	router gin.IRouter,
 	userHandler *handlers.UserHandler,
 	todoHandler *handlers.TodoHandler,
 	healthHandler *handlers.HealthHandler,

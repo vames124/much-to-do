@@ -172,23 +172,23 @@ func setupRouter(db *mongo.Client, cfg config.Config, tokenSvc *auth.TokenServic
 	// Apply CORS middleware to the router
 	router.Use(corsMiddleware)
 
-	// Register all routes
-	routes.RegisterRoutes(router, userHandler, todoHandler, healthHandler, authMiddleware)
-
-	// A simple ping route for health checks
+	// Root-level health check routes (used by ALB health checks directly)
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
+
+	router.GET("/health", healthHandler.CheckHealth)
 
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Welcome to MuchToDo API"})
 	})
 
-	// Test route to debug /todos issue
-	router.GET("/test-todos", func(c *gin.Context) {
-		println("=== TEST TODOS ROUTE HIT ===")
-		c.JSON(http.StatusOK, gin.H{"message": "Test todos route works!"})
-	})
+	// All application routes live under /api so CloudFront can proxy /api/* to the ALB.
+	// This avoids mixed-content issues (frontend is served over HTTPS via CloudFront).
+	apiGroup := router.Group("/api")
+
+	// Register all routes under /api
+	routes.RegisterRoutes(apiGroup, userHandler, todoHandler, healthHandler, authMiddleware)
 
 	// Handle 404
 	router.NoRoute(func(c *gin.Context) {
